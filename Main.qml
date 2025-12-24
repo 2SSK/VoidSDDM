@@ -65,6 +65,13 @@ Rectangle {
         }
     }
     
+    // Power buttons at bottom center
+    PowerButtons {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 30
+    }
+    
     Component.onCompleted: {
         passwordInput.focus = true
     }
