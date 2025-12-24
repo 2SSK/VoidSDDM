@@ -20,7 +20,7 @@ Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.margins: 20
-        opacity: mainRect.fadeInComplete ? 1 : 0
+        opacity: (mainRect.fadeInComplete ? 1 : 0) * mainRect.elementOpacity
         
         Behavior on opacity {
             NumberAnimation { duration: mainRect.fadeInDuration; easing.type: Easing.OutCubic }
@@ -38,6 +38,12 @@ Rectangle {
     property bool allowEmptyPassword: config.boolValue("allowEmptyPassword") || false
     property int passwordFieldOffsetX: config.intValue("passwordFieldOffsetX") || 0
     property int passwordFieldOffsetY: config.intValue("passwordFieldOffsetY") || 0
+    property real elementOpacity: {
+        var opacity = config.stringValue("elementOpacity")
+        if (opacity === "") return 1.0
+        var num = parseFloat(opacity)
+        return (num >= 0.0 && num <= 1.0) ? num : 1.0
+    }
     
     // Fade-in animation state
     property bool fadeInComplete: false
@@ -73,6 +79,7 @@ Rectangle {
         anchors.bottom: passwordField.top
         anchors.bottomMargin: mainRect.elementSpacing
         clip: true
+        opacity: mainRect.elementOpacity
         
         Behavior on height {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
@@ -82,7 +89,7 @@ Rectangle {
             id: userSelect
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            opacity: mainRect.activeSelector === "user" ? 1 : 0
+            opacity: (mainRect.activeSelector === "user" ? 1 : 0) * mainRect.elementOpacity
             visible: opacity > 0
             
             Behavior on opacity {
@@ -105,7 +112,7 @@ Rectangle {
         anchors.right: passwordField.left
         anchors.rightMargin: 15
         anchors.verticalCenter: passwordField.verticalCenter
-        opacity: visible ? 1 : 0
+        opacity: (visible ? 1 : 0) * mainRect.elementOpacity
         
         Behavior on opacity {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
@@ -122,6 +129,7 @@ Rectangle {
         enabled: mainRect.activeSelector === "password"
         fadeInComplete: mainRect.fadeInComplete
         fadeInDuration: mainRect.fadeInDuration
+        elementOpacity: mainRect.elementOpacity
         
         onLoginRequested: {
             var savedPassword = passwordField.passwordText
@@ -160,6 +168,7 @@ Rectangle {
         anchors.top: passwordField.bottom
         anchors.topMargin: mainRect.elementSpacing
         clip: true
+        opacity: mainRect.elementOpacity
         
         Behavior on height {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
@@ -169,7 +178,7 @@ Rectangle {
             id: sessionSelect
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            opacity: mainRect.activeSelector === "session" ? 1 : 0
+            opacity: (mainRect.activeSelector === "session" ? 1 : 0) * mainRect.elementOpacity
             visible: opacity > 0
             
             Behavior on opacity {
@@ -188,32 +197,55 @@ Rectangle {
         anchors.horizontalCenter: passwordField.horizontalCenter
         anchors.top: passwordField.bottom
         anchors.topMargin: config.intValue("selectorPreviewMargin") || 10
-        visible: mainRect.showPreview && mainRect.activeSelector !== "session" && sessionSelect.selectedSession !== ""
-        opacity: (visible && mainRect.fadeInComplete) ? 1 : 0
+        visible: mainRect.showPreview && mainRect.activeSelector !== "session" && mainRect.activeSelector !== "power" && sessionSelect.selectedSession !== ""
+        opacity: ((visible && mainRect.fadeInComplete) ? 1 : 0) * mainRect.elementOpacity
         
         Behavior on opacity {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
         }
     }
     
-    // Power buttons at bottom center
-    PowerButtons {
-        id: powerButtons
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: config.intValue("powerButtonBottomMargin") || 30
-        activeButton: mainRect.activeSelector === "power" ? mainRect.activePowerButton : -1
-        fadeInComplete: mainRect.fadeInComplete
-        fadeInDuration: mainRect.fadeInDuration
+    // Power buttons selector (at session selector position)
+    Item {
+        id: powerButtonContainer
+        width: passwordField.width
+        height: mainRect.activeSelector === "power" ? (config.intValue("selectorHeight") || 35) : 0
+        anchors.horizontalCenter: passwordField.horizontalCenter
+        anchors.top: passwordField.bottom
+        anchors.topMargin: mainRect.elementSpacing
+        clip: true
+        opacity: mainRect.elementOpacity
+        
+        Behavior on height {
+            NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
+        }
+        
+        PowerButtons {
+            id: powerButtons
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            activeButton: mainRect.activeSelector === "power" ? mainRect.activePowerButton : 0
+            fadeInComplete: mainRect.fadeInComplete
+            fadeInDuration: mainRect.fadeInDuration
+            elementOpacity: mainRect.elementOpacity
+            opacity: (mainRect.activeSelector === "power" ? 1 : 0) * mainRect.elementOpacity
+            visible: opacity > 0
+            
+            onActiveButtonChanged: {
+                if (mainRect.activeSelector === "power") {
+                    mainRect.activePowerButton = powerButtons.activeButton
+                }
+            }
+            
+            Behavior on opacity {
+                NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
+            }
+        }
     }
     
     function activatePowerButton() {
-        if (mainRect.activePowerButton === 0) {
-            sddm.powerOff()
-        } else if (mainRect.activePowerButton === 1) {
-            sddm.reboot()
-        } else if (mainRect.activePowerButton === 2) {
-            sddm.suspend()
+        if (mainRect.activeSelector === "power" && powerButtons) {
+            powerButtons.activateCurrentButton()
         }
     }
     
@@ -257,8 +289,20 @@ Rectangle {
                 mainRect.activeSelector = "user"
                 mainRect.focus = true
                 handled = true
+            } else if (mainRect.activeSelector === "power") {
+                // Return to session from power
+                mainRect.activeSelector = "session"
+                mainRect.focus = true
+                handled = true
+            } else if (mainRect.activeSelector === "session") {
+                // Return to password from session
+                returnToPassword()
+                handled = true
+            } else if (mainRect.activeSelector === "user") {
+                // Do nothing on user selector
+                handled = false
             } else {
-                // Return to password from any selector
+                // Return to password from any other selector
                 returnToPassword()
                 handled = true
             }
@@ -275,10 +319,8 @@ Rectangle {
                 mainRect.focus = true
                 handled = true
             } else if (mainRect.activeSelector === "power") {
-                // Return to session from power
-                mainRect.activeSelector = "session"
-                mainRect.focus = true
-                handled = true
+                // Do nothing on power button
+                handled = false
             } else {
                 // Return to password from any selector
                 returnToPassword()
@@ -292,7 +334,10 @@ Rectangle {
                 handled = navigateSelector("session", "left")
             } else if (mainRect.activeSelector === "power") {
                 // Navigate left in power buttons
-                mainRect.activePowerButton = mainRect.activePowerButton > 0 ? mainRect.activePowerButton - 1 : 2
+                if (powerButtons) {
+                    powerButtons.activeButton = powerButtons.activeButton > 0 ? powerButtons.activeButton - 1 : 2
+                    mainRect.activePowerButton = powerButtons.activeButton
+                }
                 handled = true
             }
         } else if (event.key === Qt.Key_Right) {
@@ -303,7 +348,10 @@ Rectangle {
                 handled = navigateSelector("session", "right")
             } else if (mainRect.activeSelector === "power") {
                 // Navigate right in power buttons
-                mainRect.activePowerButton = mainRect.activePowerButton < 2 ? mainRect.activePowerButton + 1 : 0
+                if (powerButtons) {
+                    powerButtons.activeButton = powerButtons.activeButton < 2 ? powerButtons.activeButton + 1 : 0
+                    mainRect.activePowerButton = powerButtons.activeButton
+                }
                 handled = true
             }
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {

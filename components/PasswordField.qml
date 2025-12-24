@@ -10,6 +10,7 @@ Rectangle {
     property bool enabled: true
     property bool fadeInComplete: true
     property int fadeInDuration: 300
+    property real elementOpacity: 1.0
     property bool hasError: false
     property bool showPasswordButton: config.boolValue("showPasswordButton") || false
     property bool passwordVisible: false
@@ -34,7 +35,7 @@ Rectangle {
     
     signal loginRequested()
     
-    opacity: root.fadeInComplete ? 1 : 0
+    opacity: (root.fadeInComplete ? 1 : 0) * root.elementOpacity
     
     Behavior on opacity {
         NumberAnimation { duration: root.fadeInDuration; easing.type: Easing.OutCubic }

@@ -4,128 +4,106 @@ import SddmComponents 2.0
 Row {
     id: root
     
-    spacing: config.intValue("powerButtonSpacing") || 20
-    property int buttonSize: config.intValue("powerButtonSize") || 50
-    property int activeButton: -1 // -1 = none, 0 = shutdown, 1 = restart, 2 = suspend (from keyboard)
-    property int hoveredButton: -1 // -1 = none, 0 = shutdown, 1 = restart, 2 = suspend (from mouse)
+    spacing: config.intValue("selectorSpacing") || 10
+    
+    property int activeButton: -1 // -1 = none, 0 = shutdown, 1 = restart, 2 = suspend
     property bool fadeInComplete: true
     property int fadeInDuration: 300
+    property real elementOpacity: 1.0
     
-    // Effective active button: hover takes priority over keyboard
-    property int effectiveActiveButton: hoveredButton !== -1 ? hoveredButton : activeButton
+    property int selectorHeight: config.intValue("selectorHeight") || 35
+    property int arrowWidth: config.intValue("selectorArrowWidth") || 30
+    property int selectorRadius: config.intValue("selectorRadius") || 0
+    property int containerWidth: parent ? parent.width : 0
     
-    opacity: root.fadeInComplete ? 1 : 0
+    anchors.horizontalCenter: parent.horizontalCenter
     
-    Behavior on opacity {
-        NumberAnimation { duration: root.fadeInDuration; easing.type: Easing.OutCubic }
-    }
+    // Power button labels
+    readonly property var buttonLabels: ["shutdown", "restart", "suspend"]
+    readonly property string currentLabel: root.activeButton >= 0 && root.activeButton < buttonLabels.length ? buttonLabels[root.activeButton] : ""
     
-    // Shutdown button
+    // Left arrow button
     Rectangle {
-        id: shutdownButton
-        width: root.buttonSize
-        height: root.buttonSize
-        radius: width / 2
-        color: config.stringValue("powerButtonBackground") || '#333333'
-        border.color: root.effectiveActiveButton === 0 ? (config.stringValue("powerButtonBorderActive") || config.stringValue("passwordFieldBorderActive") || '#aaaaaa') : (config.stringValue("powerButtonBorder") || '#888888')
-        border.width: root.effectiveActiveButton === 0 ? 2 : 1
-        antialiasing: true
-        
-        Behavior on border.width {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
-        Behavior on border.color {
-            ColorAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
+        width: root.arrowWidth
+        height: root.selectorHeight
+        radius: root.selectorRadius
+        color: config.stringValue("selectorBackground") || '#000000'
+
         Text {
-            text: "⏻"
+            text: "<"
             color: config.stringValue("textColor") || "#c4c4c4"
-            font.pixelSize: root.buttonSize * 0.48
+            font.pixelSize: config.intValue("selectorArrowFontSize") || 17
             font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
             anchors.centerIn: parent
         }
-        
+
         MouseArea {
             anchors.fill: parent
-            hoverEnabled: true
-            onEntered: root.hoveredButton = 0
-            onExited: root.hoveredButton = -1
-            onClicked: sddm.powerOff()
-        }
-    }
-    
-    // Restart button
-    Rectangle {
-        id: restartButton
-        width: root.buttonSize
-        height: root.buttonSize
-        radius: width / 2
-        color: config.stringValue("powerButtonBackground") || '#333333'
-        border.color: root.effectiveActiveButton === 1 ? (config.stringValue("powerButtonBorderActive") || config.stringValue("passwordFieldBorderActive") || '#aaaaaa') : (config.stringValue("powerButtonBorder") || '#888888')
-        border.width: root.effectiveActiveButton === 1 ? 2 : 1
-        antialiasing: true
-        
-        Behavior on border.width {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
-        Behavior on border.color {
-            ColorAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
-        Text {
-            text: "↻"
-            color: config.stringValue("textColor") || "#c4c4c4"
-            font.pixelSize: root.buttonSize * 0.48
-            font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
-            anchors.centerIn: parent
-        }
-        
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            onEntered: root.hoveredButton = 1
-            onExited: root.hoveredButton = -1
-            onClicked: sddm.reboot()
+            onClicked: {
+                if (root.activeButton > 0) {
+                    root.activeButton--
+                } else {
+                    root.activeButton = 2
+                }
+            }
         }
     }
 
-    // Suspend button
+    // Power action display
     Rectangle {
-        id: suspendButton
-        width: root.buttonSize
-        height: root.buttonSize
-        radius: width / 2
-        color: config.stringValue("powerButtonBackground") || '#333333'
-        border.color: root.effectiveActiveButton === 2 ? (config.stringValue("powerButtonBorderActive") || config.stringValue("passwordFieldBorderActive") || '#aaaaaa') : (config.stringValue("powerButtonBorder") || '#888888')
-        border.width: root.effectiveActiveButton === 2 ? 2 : 1
-        antialiasing: true
-        
-        Behavior on border.width {
-            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
-        Behavior on border.color {
-            ColorAnimation { duration: 200; easing.type: Easing.OutCubic }
-        }
-        
+        width: root.containerWidth - (root.arrowWidth * 2) - (root.spacing * 2) - 20
+        height: root.selectorHeight
+        radius: root.selectorRadius
+        color: config.stringValue("selectorBackground") || '#000000'
+        clip: true
+
         Text {
-            text: "⏾"
+            text: root.currentLabel
             color: config.stringValue("textColor") || "#c4c4c4"
-            font.pixelSize: root.buttonSize * 0.48
+            font.pixelSize: config.intValue("selectorFontSize") || 14
+            font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
+            anchors.fill: parent
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
+        }
+    }
+
+    // Right arrow button
+    Rectangle {
+        width: root.arrowWidth
+        height: root.selectorHeight
+        radius: root.selectorRadius
+        color: config.stringValue("selectorBackground") || '#000000'
+
+        Text {
+            text: ">"
+            color: config.stringValue("textColor") || "#c4c4c4"
+            font.pixelSize: config.intValue("selectorArrowFontSize") || 17
             font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
             anchors.centerIn: parent
         }
-        
+
         MouseArea {
             anchors.fill: parent
-            hoverEnabled: true
-            onEntered: root.hoveredButton = 2
-            onExited: root.hoveredButton = -1
-            onClicked: sddm.suspend()
+            onClicked: {
+                if (root.activeButton < 2) {
+                    root.activeButton++
+                } else {
+                    root.activeButton = 0
+                }
+            }
+        }
+    }
+    
+    // Handle Enter key to activate power action
+    function activateCurrentButton() {
+        if (root.activeButton === 0) {
+            sddm.powerOff()
+        } else if (root.activeButton === 1) {
+            sddm.reboot()
+        } else if (root.activeButton === 2) {
+            sddm.suspend()
         }
     }
 }
-
