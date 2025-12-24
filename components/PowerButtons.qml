@@ -7,6 +7,14 @@ Row {
     spacing: config.intValue("powerButtonSpacing") || 20
     property int buttonSize: config.intValue("powerButtonSize") || 50
     property int activeButton: -1 // -1 = none, 0 = shutdown, 1 = restart, 2 = suspend
+    property bool fadeInComplete: true
+    property int fadeInDuration: 300
+    
+    opacity: root.fadeInComplete ? 1 : 0
+    
+    Behavior on opacity {
+        NumberAnimation { duration: root.fadeInDuration; easing.type: Easing.OutCubic }
+    }
     
     // Shutdown button
     Rectangle {

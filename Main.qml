@@ -20,14 +20,28 @@ Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.margins: 20
+        opacity: mainRect.fadeInComplete ? 1 : 0
+        
+        Behavior on opacity {
+            NumberAnimation { duration: mainRect.fadeInDuration; easing.type: Easing.OutCubic }
+        }
     }
     
     // Config properties
     color: config.stringValue("background") || '#000000'
     property int animationDuration: config.intValue("animationDuration") || 200
+    property int fadeInDuration: config.intValue("fadeInDuration") || 300
     property int elementSpacing: config.intValue("elementSpacing") || 15
     property bool showPreview: config.boolValue("showSelectorPreview") || false
     property bool showHelpTips: config.boolValue("showHelpTips") || false
+    property bool showCapsLockIndicator: config.boolValue("showCapsLockIndicator") || false
+    
+    // Fade-in animation state
+    property bool fadeInComplete: false
+    Component.onCompleted: {
+        fadeInComplete = true
+        passwordField.passwordInput.focus = true
+    }
     
     // User preview text (above password field)
     Text {
@@ -40,7 +54,7 @@ Rectangle {
         anchors.bottom: passwordField.top
         anchors.bottomMargin: config.intValue("selectorPreviewMargin") || 10
         visible: mainRect.showPreview && mainRect.activeSelector !== "user" && userSelect.selectedUser !== ""
-        opacity: visible ? 1 : 0
+        opacity: (visible && mainRect.fadeInComplete) ? 1 : 0
         
         Behavior on opacity {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
@@ -74,14 +88,53 @@ Rectangle {
         }
     }
     
+    // Caps Lock state tracking
+    property bool capsLockActive: false
+    
+    // Caps Lock indicator
+    Text {
+        id: capsLockIndicator
+        visible: mainRect.showCapsLockIndicator && mainRect.capsLockActive
+        text: "CAPS LOCK"
+        color: config.stringValue("capsLockIndicatorColor") || "#ffaa00"
+        font.pixelSize: config.intValue("capsLockIndicatorFontSize") || 12
+        font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
+        anchors.right: passwordField.left
+        anchors.rightMargin: 15
+        anchors.verticalCenter: passwordField.verticalCenter
+        opacity: visible ? 1 : 0
+        
+        Behavior on opacity {
+            NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
+        }
+    }
+    
     // Password field
     PasswordField {
         id: passwordField
         anchors.centerIn: parent
         enabled: mainRect.activeSelector === "password"
+        fadeInComplete: mainRect.fadeInComplete
+        fadeInDuration: mainRect.fadeInDuration
         
         onLoginRequested: {
-            sddm.login(userSelect.selectedUser, passwordField.passwordText, sessionSelect.selectedIndex)
+            var savedPassword = passwordField.passwordText
+            passwordField.passwordText = "" // Clear password field
+            sddm.login(userSelect.selectedUser, savedPassword, sessionSelect.selectedIndex)
+            
+            // Check for login error after a short delay
+            loginErrorTimer.start()
+        }
+    }
+    
+    Timer {
+        id: loginErrorTimer
+        interval: 500 // Short delay to check if login failed
+        onTriggered: {
+            // If we're still on the login screen, assume login failed
+            if (mainRect.activeSelector === "password") {
+                passwordField.hasError = true
+            }
         }
     }
     
@@ -123,7 +176,7 @@ Rectangle {
         anchors.top: passwordField.bottom
         anchors.topMargin: config.intValue("selectorPreviewMargin") || 10
         visible: mainRect.showPreview && mainRect.activeSelector !== "session" && sessionSelect.selectedSession !== ""
-        opacity: visible ? 1 : 0
+        opacity: (visible && mainRect.fadeInComplete) ? 1 : 0
         
         Behavior on opacity {
             NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
@@ -137,6 +190,8 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: config.intValue("powerButtonBottomMargin") || 30
         activeButton: mainRect.activeSelector === "power" ? mainRect.activePowerButton : -1
+        fadeInComplete: mainRect.fadeInComplete
+        fadeInDuration: mainRect.fadeInDuration
     }
     
     function activatePowerButton() {
@@ -174,8 +229,14 @@ Rectangle {
         return true
     }
     
-    Keys.onPressed: {
+    Keys.onPressed: function(event) {
         var handled = false
+        
+        // Track Caps Lock state
+        if (event.key === Qt.Key_CapsLock) {
+            mainRect.capsLockActive = !mainRect.capsLockActive
+            return
+        }
         
         if (event.key === Qt.Key_Up) {
             if (mainRect.activeSelector === "password") {
@@ -243,10 +304,6 @@ Rectangle {
         if (handled) {
             event.accepted = true
         }
-    }
-    
-    Component.onCompleted: {
-        passwordField.passwordInput.focus = true
     }
     
     // Hide cursor if configured
