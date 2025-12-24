@@ -1,6 +1,8 @@
 import QtQuick 2.0
 import SddmComponents 2.0
 import "components"
+import "utils/ConfigManager.js" as ConfigManager
+import "utils/NavigationHandler.js" as NavigationHandler
 
 Rectangle {
     id: mainRect
@@ -8,24 +10,7 @@ Rectangle {
     
     property string activeSelector: "password" // "password", "user", "session", "power"
     property int activePowerButton: 0 // 0=shutdown, 1=restart, 2=suspend
-    
-    // Help tips (top left)
-    Text {
-        id: helpTips
-        visible: mainRect.showHelpTips
-        text: "F10 - suspend\nF11 - shutdown\nF12 - restart"
-        color: config.stringValue("helpTipsColor") || "#666666"
-        font.pixelSize: config.intValue("helpTipsFontSize") || 11
-        font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.margins: 20
-        opacity: (mainRect.fadeInComplete ? 1 : 0) * mainRect.elementOpacity
-        
-        Behavior on opacity {
-            NumberAnimation { duration: mainRect.fadeInDuration; easing.type: Easing.OutCubic }
-        }
-    }
+    property bool capsLockActive: false
     
     // Config properties
     color: config.stringValue("background") || '#000000'
@@ -36,14 +21,10 @@ Rectangle {
     property bool showHelpTips: config.boolValue("showHelpTips") || false
     property bool showCapsLockIndicator: config.boolValue("showCapsLockIndicator") || false
     property bool allowEmptyPassword: config.boolValue("allowEmptyPassword") || false
+    property bool clearPasswordOnError: config.boolValue("clearPasswordOnError") !== false
     property int passwordFieldOffsetX: config.intValue("passwordFieldOffsetX") || 0
     property int passwordFieldOffsetY: config.intValue("passwordFieldOffsetY") || 0
-    property real elementOpacity: {
-        var opacity = config.stringValue("elementOpacity")
-        if (opacity === "") return 1.0
-        var num = parseFloat(opacity)
-        return (num >= 0.0 && num <= 1.0) ? num : 1.0
-    }
+    property real elementOpacity: ConfigManager.getElementOpacity(config)
     
     // Fade-in animation state
     property bool fadeInComplete: false
@@ -52,25 +33,31 @@ Rectangle {
         passwordField.passwordInput.focus = true
     }
     
-    // User preview text (above password field)
-    Text {
+    // Help tips
+    HelpTips {
+        id: helpTips
+        showHelpTips: mainRect.showHelpTips
+        fadeInComplete: mainRect.fadeInComplete
+        fadeInDuration: mainRect.fadeInDuration
+        elementOpacity: mainRect.elementOpacity
+    }
+    
+    // User preview
+    SelectorPreview {
         id: userPreview
-        text: userSelect.selectedUser
-        color: config.stringValue("selectorPreviewColor") || "#666666"
-        font.pixelSize: config.intValue("selectorPreviewFontSize") || 11
-        font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
+        previewText: userSelect.selectedUser
+        showPreview: mainRect.showPreview
+        activeSelector: mainRect.activeSelector
+        hideWhenSelector: "user"
+        fadeInComplete: mainRect.fadeInComplete
+        animationDuration: mainRect.animationDuration
+        elementOpacity: mainRect.elementOpacity
         anchors.horizontalCenter: passwordField.horizontalCenter
         anchors.bottom: passwordField.top
         anchors.bottomMargin: config.intValue("selectorPreviewMargin") || 10
-        visible: mainRect.showPreview && mainRect.activeSelector !== "user" && userSelect.selectedUser !== ""
-        opacity: (visible && mainRect.fadeInComplete) ? 1 : 0
-        
-        Behavior on opacity {
-            NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
-        }
     }
     
-    // User selector
+    // User selector container
     Item {
         id: userSelectContainer
         width: passwordField.width
@@ -98,25 +85,16 @@ Rectangle {
         }
     }
     
-    // Caps Lock state tracking
-    property bool capsLockActive: false
-    
     // Caps Lock indicator
-    Text {
+    CapsLockIndicator {
         id: capsLockIndicator
-        visible: mainRect.showCapsLockIndicator && mainRect.capsLockActive
-        text: "CAPS LOCK"
-        color: config.stringValue("capsLockIndicatorColor") || "#ffaa00"
-        font.pixelSize: config.intValue("capsLockIndicatorFontSize") || 12
-        font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
+        showCapsLockIndicator: mainRect.showCapsLockIndicator
+        capsLockActive: mainRect.capsLockActive
+        animationDuration: mainRect.animationDuration
+        elementOpacity: mainRect.elementOpacity
         anchors.right: passwordField.left
         anchors.rightMargin: 15
         anchors.verticalCenter: passwordField.verticalCenter
-        opacity: (visible ? 1 : 0) * mainRect.elementOpacity
-        
-        Behavior on opacity {
-            NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
-        }
     }
     
     // Password field
@@ -136,30 +114,29 @@ Rectangle {
             
             // Check if empty password is allowed
             if (!mainRect.allowEmptyPassword && savedPassword.length === 0) {
-                // Don't attempt login with empty password
                 return
             }
             
-            passwordField.passwordText = "" // Clear password field
             sddm.login(userSelect.selectedUser, savedPassword, sessionSelect.selectedIndex)
-            
-            // Check for login error after a short delay
             loginErrorTimer.start()
         }
     }
     
+    // Login error timer
     Timer {
         id: loginErrorTimer
-        interval: config.intValue("loginErrorDelay") || 500 // Delay to check if login failed
+        interval: config.intValue("loginErrorDelay") || 500
         onTriggered: {
-            // If we're still on the login screen, assume login failed
             if (mainRect.activeSelector === "password") {
                 passwordField.hasError = true
+                if (mainRect.clearPasswordOnError) {
+                    passwordField.passwordText = ""
+                }
             }
         }
     }
     
-    // Session selector
+    // Session selector container
     Item {
         id: sessionSelectContainer
         width: passwordField.width
@@ -187,25 +164,23 @@ Rectangle {
         }
     }
     
-    // Session preview text (below password field)
-    Text {
+    // Session preview
+    SelectorPreview {
         id: sessionPreview
-        text: sessionSelect.selectedSession
-        color: config.stringValue("selectorPreviewColor") || "#666666"
-        font.pixelSize: config.intValue("selectorPreviewFontSize") || 11
-        font.family: config.stringValue("fontFamily") || "JetBrains Mono Nerd Font"
+        previewText: sessionSelect.selectedSession
+        showPreview: mainRect.showPreview
+        activeSelector: mainRect.activeSelector
+        hideWhenSelector: "session"
+        fadeInComplete: mainRect.fadeInComplete
+        animationDuration: mainRect.animationDuration
+        elementOpacity: mainRect.elementOpacity
         anchors.horizontalCenter: passwordField.horizontalCenter
         anchors.top: passwordField.bottom
         anchors.topMargin: config.intValue("selectorPreviewMargin") || 10
         visible: mainRect.showPreview && mainRect.activeSelector !== "session" && mainRect.activeSelector !== "power" && sessionSelect.selectedSession !== ""
-        opacity: ((visible && mainRect.fadeInComplete) ? 1 : 0) * mainRect.elementOpacity
-        
-        Behavior on opacity {
-            NumberAnimation { duration: mainRect.animationDuration; easing.type: Easing.OutCubic }
-        }
     }
     
-    // Power buttons selector (at session selector position)
+    // Power buttons selector container
     Item {
         id: powerButtonContainer
         width: passwordField.width
@@ -243,6 +218,7 @@ Rectangle {
         }
     }
     
+    // Navigation functions
     function activatePowerButton() {
         if (mainRect.activeSelector === "power" && powerButtons) {
             powerButtons.activateCurrentButton()
@@ -255,25 +231,10 @@ Rectangle {
     }
     
     function navigateSelector(selector, direction) {
-        var count = selector === "user" ? userSelect.userCount : sessionSelect.sessionCount
-        if (count === 0) return false
-        
-        var currentIndex = selector === "user" ? userSelect.selectedIndex : sessionSelect.selectedIndex
-        
-        if (direction === "left") {
-            currentIndex = currentIndex > 0 ? currentIndex - 1 : count - 1
-        } else {
-            currentIndex = currentIndex < count - 1 ? currentIndex + 1 : 0
-        }
-        
-        if (selector === "user") {
-            userSelect.selectedIndex = currentIndex
-        } else {
-            sessionSelect.selectedIndex = currentIndex
-        }
-        return true
+        return NavigationHandler.navigateSelector(selector, direction, userSelect, sessionSelect)
     }
     
+    // Keyboard event handler
     Keys.onPressed: function(event) {
         var handled = false
         
@@ -285,91 +246,74 @@ Rectangle {
         
         if (event.key === Qt.Key_Up) {
             if (mainRect.activeSelector === "password") {
-                // Show user selector
                 mainRect.activeSelector = "user"
                 mainRect.focus = true
                 handled = true
             } else if (mainRect.activeSelector === "power") {
-                // Return to session from power
                 mainRect.activeSelector = "session"
                 mainRect.focus = true
                 handled = true
             } else if (mainRect.activeSelector === "session") {
-                // Return to password from session
                 returnToPassword()
                 handled = true
             } else if (mainRect.activeSelector === "user") {
-                // Do nothing on user selector
                 handled = false
             } else {
-                // Return to password from any other selector
                 returnToPassword()
                 handled = true
             }
         } else if (event.key === Qt.Key_Down) {
             if (mainRect.activeSelector === "password") {
-                // Show session selector
                 mainRect.activeSelector = "session"
                 mainRect.focus = true
                 handled = true
             } else if (mainRect.activeSelector === "session") {
-                // Go to power buttons
                 mainRect.activeSelector = "power"
                 mainRect.activePowerButton = 0
                 mainRect.focus = true
                 handled = true
             } else if (mainRect.activeSelector === "power") {
-                // Do nothing on power button
                 handled = false
             } else {
-                // Return to password from any selector
                 returnToPassword()
                 handled = true
             }
         } else if (event.key === Qt.Key_Left) {
-            // Navigate left in active selector
             if (mainRect.activeSelector === "user") {
                 handled = navigateSelector("user", "left")
             } else if (mainRect.activeSelector === "session") {
                 handled = navigateSelector("session", "left")
             } else if (mainRect.activeSelector === "power") {
-                // Navigate left in power buttons
-                if (powerButtons) {
-                    powerButtons.activeButton = powerButtons.activeButton > 0 ? powerButtons.activeButton - 1 : 2
-                    mainRect.activePowerButton = powerButtons.activeButton
+                var newButton = NavigationHandler.navigatePowerButton("left", powerButtons, mainRect.activePowerButton)
+                if (newButton !== false) {
+                    mainRect.activePowerButton = newButton
                 }
                 handled = true
             }
         } else if (event.key === Qt.Key_Right) {
-            // Navigate right in active selector
             if (mainRect.activeSelector === "user") {
                 handled = navigateSelector("user", "right")
             } else if (mainRect.activeSelector === "session") {
                 handled = navigateSelector("session", "right")
             } else if (mainRect.activeSelector === "power") {
-                // Navigate right in power buttons
-                if (powerButtons) {
-                    powerButtons.activeButton = powerButtons.activeButton < 2 ? powerButtons.activeButton + 1 : 0
-                    mainRect.activePowerButton = powerButtons.activeButton
+                var newButton = NavigationHandler.navigatePowerButton("right", powerButtons, mainRect.activePowerButton)
+                if (newButton !== false) {
+                    mainRect.activePowerButton = newButton
                 }
                 handled = true
             }
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            // Activate power button
             if (mainRect.activeSelector === "power") {
                 activatePowerButton()
                 handled = true
             }
         } else if (event.key === Qt.Key_F10) {
-            // Suspend
             sddm.suspend()
             handled = true
         } else if (event.key === Qt.Key_F11) {
-            // Shutdown
             sddm.powerOff()
             handled = true
         } else if (event.key === Qt.Key_F12) {
-            // Restart
             sddm.reboot()
             handled = true
         }
