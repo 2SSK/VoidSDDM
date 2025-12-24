@@ -7,6 +7,7 @@ Row {
     
     property int selectedIndex: userModel.lastIndex
     property string selectedUser: userRepeater.count > 0 ? userRepeater.itemAt(root.selectedIndex).userName : ""
+    property alias userCount: userRepeater.count
     
     // Left arrow button
     Rectangle {

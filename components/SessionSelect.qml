@@ -6,6 +6,7 @@ Row {
     spacing: 10
     
     property int selectedIndex: sessionModel.lastIndex
+    property alias sessionCount: sessionRepeater.count
     
     // Left arrow button
     Rectangle {
