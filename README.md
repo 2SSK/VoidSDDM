@@ -2,7 +2,36 @@
 
 A minimal and clean SDDM login theme with customizable appearance and smooth animations.
 
-**[Watch Showcase Video](assets/showcase.mp4)**
+https://github.com/user-attachments/assets/3466105d-9b18-4c78-8c42-7708ccf43605
+
+# Presets
+
+<details>
+  <summary>configs/default.conf</summary>
+<img width="327" height="177" alt="image" src="https://github.com/user-attachments/assets/1c27810f-a00a-484f-98e0-9b5df6603a81" />
+</details>
+
+<details>
+  <summary>configs/gruvbox.conf</summary>
+<img width="344" height="189" alt="image" src="https://github.com/user-attachments/assets/2fb87d54-c416-463c-a43f-be19ba37b584" />
+</details>
+
+<details>
+  <summary>configs/everforest.conf</summary>
+<img width="331" height="183" alt="image" src="https://github.com/user-attachments/assets/3cb8eec8-eb6f-4bc2-8a10-074b8a0ace83" />
+</details>
+
+<details>
+  <summary>configs/catppuccin.conf</summary>
+<img width="337" height="171" alt="image" src="https://github.com/user-attachments/assets/15c1f695-3fed-4101-b1e0-a2c74b9be156" />
+</details>
+
+<details>
+  <summary>configs/nord.conf</summary>
+<img width="334" height="169" alt="image" src="https://github.com/user-attachments/assets/22c037a4-d43b-42bb-8123-1d40e3ff2784" />
+</details>
+
+[`Customization guide`](#Themes)
 
 ## Installation
 
@@ -37,7 +66,7 @@ You can preview the set theme without logging out by runnning:
 sddm-greeter --test-mode --theme /usr/share/sddm/themes/voidsddm
 ```
 
-## Themes
+# Themes
 
 The theme includes multiple color schemes in the `configs/` folder:
 
