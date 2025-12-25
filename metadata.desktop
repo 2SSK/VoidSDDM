@@ -4,6 +4,12 @@ Description=Very minimal sddm theme.
 Author=Talyam
 Version=1.0
 MainScript=Main.qml
-ConfigFile=theme.conf
 Theme-Id=void
 QtVersion=6
+
+ConfigFile=configs/default.conf
+; configs/default.conf
+; configs/gruvbox.conf
+; configs/everforest.conf
+; configs/catppuccin.conf
+; configs/nord.conf
